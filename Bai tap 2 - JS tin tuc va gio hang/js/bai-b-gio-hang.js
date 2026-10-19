@@ -1,0 +1,158 @@
+/* BÀI B — VIẾT CODE: Giỏ hàng của xưởng in
+   Hoàn thiện class GioHang và hàm napGioHang.
+   Không đổi tên class, tên phương thức, tên hàm; không sửa phần "DỮ LIỆU ĐÃ CHO". */
+
+// ---------- DỮ LIỆU ĐÃ CHO (không sửa) ----------
+const DANH_MUC = [
+	{ id: "TC01", ten: "Thiệp cưới cotton", loai: "thiep cuoi", gia: 1500 },
+	{ id: "TC02", ten: "Thiệp cưới kraft", loai: "thiep cuoi", gia: 900 },
+	{ id: "DT01", ten: "Danh thiếp ép kim", loai: "danh thiep", gia: 1200 },
+	{ id: "PB01", ten: "Phong bì lót lụa", loai: "phu kien", gia: 500 }
+];
+
+// ---------- PHẦN BẠN VIẾT ----------
+class GioHang {
+	constructor() {
+		// Mỗi dòng của giỏ là một object { id, ten, loai, gia, soLuong }.
+		this.dsDong = [];
+	}
+
+	// 1. Thêm sản phẩm; trả về true nếu thêm được, false nếu soLuong không hợp lệ.
+	them(sanPham, soLuong) {
+		// Kiểm tra soLuong hợp lệ: phải là kiểu number, số nguyên và > 0
+		if (typeof soLuong !== 'number' || !Number.isInteger(soLuong) || soLuong <= 0) {
+			return false;
+		}
+
+		if (!sanPham || !sanPham.id) {
+			return false;
+		}
+
+		// Tìm dòng sản phẩm đã tồn tại theo id
+		const dongDaCo = this.dsDong.find(dong => dong.id === sanPham.id);
+
+		if (dongDaCo) {
+			// Nếu đã có thì cộng dồn số lượng
+			dongDaCo.soLuong += soLuong;
+		} else {
+			// Ngược lại, tạo bản sao độc lập (không dính tham chiếu sang object bên ngoài)
+			this.dsDong.push({
+				id: sanPham.id,
+				ten: sanPham.ten,
+				loai: sanPham.loai,
+				gia: sanPham.gia,
+				soLuong: soLuong
+			});
+		}
+
+		return true;
+	}
+
+	// 2. Xoá dòng có id tương ứng; trả về true nếu có xoá, false nếu không tìm thấy.
+	xoa(id) {
+		const viTri = this.dsDong.findIndex(dong => dong.id === id);
+		if (viTri !== -1) {
+			this.dsDong.splice(viTri, 1);
+			return true;
+		}
+		return false;
+	}
+
+	// 3. Tổng tiền cả giỏ.
+	tongTien() {
+		return this.dsDong.reduce((tong, dong) => tong + (dong.gia * dong.soLuong), 0);
+	}
+
+	// 4. Object thống kê: { "<loai>": tổng tiền của loại đó, ... }.
+	thongKeTheoLoai() {
+		const ketQua = {};
+		for (const dong of this.dsDong) {
+			const thanhTien = dong.gia * dong.soLuong;
+			ketQua[dong.loai] = (ketQua[dong.loai] || 0) + thanhTien;
+		}
+		return ketQua;
+	}
+
+	// 5. Dòng có thành tiền lớn nhất (bản sao, có thêm thanhTien); null nếu giỏ rỗng.
+	dongDatNhat() {
+		if (this.dsDong.length === 0) {
+			return null;
+		}
+
+		let datNhat = this.dsDong[0];
+		let maxThanhTien = datNhat.gia * datNhat.soLuong;
+
+		for (let i = 1; i < this.dsDong.length; i++) {
+			const dong = this.dsDong[i];
+			const thanhTien = dong.gia * dong.soLuong;
+			// Nếu bằng nhau -> giữ dòng đứng trước (chỉ thay đổi khi >)
+			if (thanhTien > maxThanhTien) {
+				maxThanhTien = thanhTien;
+				datNhat = dong;
+			}
+		}
+
+		return {
+			id: datNhat.id,
+			ten: datNhat.ten,
+			loai: datNhat.loai,
+			gia: datNhat.gia,
+			soLuong: datNhat.soLuong,
+			thanhTien: maxThanhTien
+		};
+	}
+
+	// 6. Mảng BẢN SAO các dòng, mỗi dòng có thêm thuộc tính thanhTien.
+	layDanhSach() {
+		return this.dsDong.map(dong => ({
+			id: dong.id,
+			ten: dong.ten,
+			loai: dong.loai,
+			gia: dong.gia,
+			soLuong: dong.soLuong,
+			thanhTien: dong.gia * dong.soLuong
+		}));
+	}
+
+	// 7. Chuỗi JSON của mảng các dòng (ĐÚNG 5 thuộc tính, không có thanhTien).
+	xuatJSON() {
+		const danhSachChuan = this.dsDong.map(dong => ({
+			id: dong.id,
+			ten: dong.ten,
+			loai: dong.loai,
+			gia: dong.gia,
+			soLuong: dong.soLuong
+		}));
+		return JSON.stringify(danhSachChuan);
+	}
+}
+
+// 8. Tạo lại một GioHang từ chuỗi JSON do xuatJSON() sinh ra.
+function napGioHang(chuoiJSON) {
+	const gioMoi = new GioHang();
+	try {
+		const mang = JSON.parse(chuoiJSON);
+		if (Array.isArray(mang)) {
+			for (const item of mang) {
+				gioMoi.them({
+					id: item.id,
+					ten: item.ten,
+					loai: item.loai,
+					gia: item.gia
+				}, item.soLuong);
+			}
+		}
+	} catch (e) {
+		// Trả về giỏ rỗng nếu chuỗi JSON không hợp lệ
+	}
+	return gioMoi;
+}
+
+// ---------- CHẠY THỬ (không sửa) ----------
+const gio = new GioHang();
+gio.them(DANH_MUC[0], 100);
+gio.them(DANH_MUC[3], 200);
+gio.them(DANH_MUC[0], 50);
+veGioHang(gio.layDanhSach(), gio.tongTien());
+console.table(gio.layDanhSach());
+hienThi(`JSON gửi lên máy chủ: ${gio.xuatJSON()}`);
